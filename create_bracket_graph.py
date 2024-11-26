@@ -12,7 +12,7 @@ class TaxBracketBreakdownGraph:
         gridline_layer = self.draw_gridlines(self.tax_breakdown_data)
 
         # Order matters
-        self.chart_assembly = [income_chart, bracket_chart, gridline_layer, 
+        self.chart_assembly = [income_chart, gridline_layer, bracket_chart,
                                total_owed_chart]
 
 
@@ -83,7 +83,7 @@ class TaxBracketBreakdownGraph:
         )
         # Add descriptive text
         income_text = income_chart.mark_text(
-            align='center', baseline='bottom', color='black', fontSize=14
+            align='center', baseline='bottom', color='black', fontSize=14, dy=-2
         ).encode(
             y=alt.Y('Income:Q', axis=self.y_axis_def), 
             text=alt.Text('Income:Q', format='$,.2f')
@@ -110,7 +110,7 @@ class TaxBracketBreakdownGraph:
         liability_text = liability_chart.transform_calculate(
             text = text_equation
         ).mark_text(
-            align='center', baseline='bottom', fontSize=14
+            align='center', baseline='bottom', fontSize=14, dy=-2
         ).encode(
             y=alt.Y('bracket_top_end_owed:Q', axis=self.y_axis_def, title=""),
             color=alt.value('black'),
@@ -118,19 +118,11 @@ class TaxBracketBreakdownGraph:
             tooltip=[alt.Tooltip('bracket_rate:Q', format='.0%', title="Bracket Tax Rate")]
         )
         # Create underlay for the descriptive text for visual clarity
-        liability_text_underlay = alt.Chart(tax_data).transform_calculate(
-            label='"Owed Per Bracket"',
-            bracket_top_end_owed='datum.bracket_owed + datum.bracket_low',
-            width='length(toString(format(datum.bracket_rate, ".0%")))'
-        ).mark_rect(
-            color='white', baseline='bottom', opacity=1, height=16,
-            width=alt.expr('30 + 5 * datum.width')
-        ).encode(
-            x=alt.X('label:N', axis=self.x_axis_def, title=""),
-            y=alt.Y('bracket_top_end_owed:Q', axis=self.y_axis_def, title=""),
-            tooltip=alt.value(None)
+        liability_text_underlay = liability_text.mark_text(
+            align='center', baseline='bottom', fontSize=14,
+            stroke='white', strokeWidth=5, strokeJoin='round', dy=-2
         )
-        return liability_text_underlay + liability_chart + liability_text
+        return  liability_text_underlay + liability_chart + liability_text
     
 
     def draw_cumulative_obligation_graph(self, income, tax_data):
@@ -157,7 +149,7 @@ class TaxBracketBreakdownGraph:
             effective_rate=f'datum.cum_owed_high / datum.income',
             text = text_equation
         ).mark_text(
-            align='center', baseline='bottom', fontSize=14
+            align='center', baseline='bottom', fontSize=14, dy=-2
         ).encode(
             x=alt.X('label:N', axis=self.x_axis_def, title=""),
             y=alt.Y('cum_owed_high:Q', axis=self.y_axis_def, title=""),
@@ -165,19 +157,13 @@ class TaxBracketBreakdownGraph:
             tooltip=[alt.Tooltip('max(cum_owed_high):Q', format='$,.2f', title="Total Owed"),
                      alt.Tooltip('max(effective_rate):Q', format='.1%', title="Effective Tax Rate")]
         )
+
         # Create underlay for the descriptive text for visual clarity
-        # Something about this is buggy https://imgur.com/a/jXzOfTy
-        cumulative_liability_underlay = alt.Chart(tax_data).transform_calculate(
-            label='"Total Owed"',
-            width=f'{text_equation}'
-        ).mark_rect(
-            color='white', baseline='bottom', opacity=1, height=16,
-            width=alt.expr('50 + 5 * length(datum.width)')
-        ).encode(
-            x=alt.X('label:N', axis=self.x_axis_def, title=""),
-            y=alt.Y('cum_owed_high:Q', axis=self.y_axis_def, title=""),
-            tooltip=alt.value(None)
+        cumulative_liability_underlay = cumulative_liability_text.mark_text(
+            align='center', baseline='bottom', fontSize=14,
+            stroke='white', strokeWidth=5, strokeJoin='round', dy=-2
         )
+
         return cumulative_liability_underlay + cumulative_liability_chart + cumulative_liability_text
     
 
@@ -189,6 +175,6 @@ class TaxBracketBreakdownGraph:
         )
         return gridlines
     
-    
+
     def get_full_combochart(self):
         return alt.layer(*self.chart_assembly)
