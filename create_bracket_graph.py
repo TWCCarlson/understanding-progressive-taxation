@@ -1,6 +1,7 @@
 import pandas as pd
 import altair as alt
-
+import pprint as pp
+import numpy as np
 class TaxBracketBreakdownGraph:
     def __init__(self, user_income: int, tax_bracket_data: dict) -> None:
         self.calculate_tax_breakdown_data(user_income, tax_bracket_data)
@@ -25,11 +26,14 @@ class TaxBracketBreakdownGraph:
         bracket_low_bound = 0
         cumulative_owed_low = 0
         for bracket_high_bound in brackets.keys():
+            print(type(bracket_high_bound))
             bracket_rate = brackets[bracket_high_bound]
             bracket_high_value = min(income, bracket_high_bound)
+            print(f"={bracket_high_value} @ {type(bracket_rate)}")
             bracket_owed = self.apply_tax_to_bracket(bracket_low_bound, 
                                                      bracket_high_value, 
                                                      bracket_rate)
+            print(f">>{bracket_owed}")
             cumulative_owed_high = cumulative_owed_low + bracket_owed
             if bracket_owed > 0:
                 df_values = [bracket_low_bound, bracket_high_bound,
@@ -43,6 +47,7 @@ class TaxBracketBreakdownGraph:
 
 
     def apply_tax_to_bracket(self, lower_limit: int, upper_limit: int, rate: float):
+        print(f"{upper_limit} - {lower_limit} * {rate}")
         return (upper_limit - lower_limit) * rate
     
 
