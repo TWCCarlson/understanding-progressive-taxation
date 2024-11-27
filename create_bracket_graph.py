@@ -3,8 +3,8 @@ import altair as alt
 import pprint as pp
 import numpy as np
 class TaxBracketBreakdownGraph:
-    def __init__(self, user_income: int, tax_bracket_data: dict) -> None:
-        self.calculate_tax_breakdown_data(user_income, tax_bracket_data)
+    def __init__(self, tax_breakdown_data, user_income: int, tax_bracket_data: dict):
+        self.tax_breakdown_data = tax_breakdown_data
         self.colorize_data()
         self.set_axis_styles(user_income, tax_bracket_data)
         income_chart = self.draw_income_graph(user_income)
@@ -15,45 +15,6 @@ class TaxBracketBreakdownGraph:
         # Order matters
         self.chart_assembly = [income_chart, gridline_layer, bracket_chart,
                                total_owed_chart]
-
-
-    def calculate_tax_breakdown_data(self, income: int, brackets: dict):
-        df_keys = ["bracket_low", "bracket_high", "bracket_rate", 
-                   "bracket_owed", "cum_owed_low", "cum_owed_high"]
-        self.tax_breakdown_data = pd.DataFrame(columns=df_keys)
-        # Starting range
-        bracket_high_bound = list(brackets.keys())[0]
-        bracket_low_bound = 0
-        cumulative_owed_low = 0
-        for bracket_high_bound in brackets.keys():
-            print(type(bracket_high_bound))
-            bracket_rate = brackets[bracket_high_bound]
-            bracket_high_value = min(income, bracket_high_bound)
-            print(f"={bracket_high_value} @ {type(bracket_rate)}")
-            bracket_owed = self.apply_tax_to_bracket(bracket_low_bound, 
-                                                     bracket_high_value, 
-                                                     bracket_rate)
-            print(f">>{bracket_owed}")
-            cumulative_owed_high = cumulative_owed_low + bracket_owed
-            if bracket_owed > 0:
-                df_values = [bracket_low_bound, bracket_high_bound,
-                             bracket_rate, bracket_owed,
-                             cumulative_owed_low, cumulative_owed_high]
-                data_row = pd.DataFrame(dict(zip(df_keys, df_values)), index=[0])
-                self.add_row_to_data(data_row)
-                # Update for next iteration
-                bracket_low_bound = bracket_high_bound
-                cumulative_owed_low = cumulative_owed_high
-
-
-    def apply_tax_to_bracket(self, lower_limit: int, upper_limit: int, rate: float):
-        print(f"{upper_limit} - {lower_limit} * {rate}")
-        return (upper_limit - lower_limit) * rate
-    
-
-    def add_row_to_data(self, row: pd.DataFrame):
-        self.tax_breakdown_data = pd.concat([self.tax_breakdown_data, row],
-                                            ignore_index=True)
 
 
     def colorize_data(self):
