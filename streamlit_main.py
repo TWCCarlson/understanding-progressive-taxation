@@ -4,13 +4,13 @@ import requests
 import glob
 import json
 import locale
-locale.setlocale(locale.LC_ALL, '')
+locale.setlocale(locale.LC_ALL, 'en_US')
 
 import create_bracket_graph
 import calculate_tax_data
 
 
-LOCAL_DEVELOPMENT = True
+LOCAL_DEVELOPMENT = False
 owner = st.secrets.database.db_username
 db_key = st.secrets.database.db_api_key
 repo = "understanding-progressive-taxation"
@@ -149,3 +149,32 @@ brackets = coerce_bracket_data_types(brackets)
 tax_breakdown_data = calculate_tax_data.calculate_tax_breakdown_data(user_income, brackets)
 chart = create_bracket_graph.TaxBracketBreakdownGraph(tax_breakdown_data, user_income, brackets)
 st.altair_chart(chart.get_full_combochart(), theme=None, use_container_width=True)
+
+st.write(f"Here's a tabular breakdown.")
+st.markdown(f"If you earn **{locale.currency(user_income, grouping=True)}** in **{fiscal_year}** as a **{filer_type}** while living in **{country}**...")
+tax_breakdown_data_display = tax_breakdown_data
+total_owed = locale.currency(tax_breakdown_data['bracket_owed'].sum(), grouping=True)
+
+def convert_to_currency(value):
+    return locale.currency(value, grouping=True)
+
+def convert_to_percent(value):
+    return f"{value*100}%"
+
+tax_breakdown_data_display['bracket_low'] = tax_breakdown_data_display['bracket_low'].apply(convert_to_currency)
+tax_breakdown_data_display['bracket_high'] = tax_breakdown_data_display['bracket_high'].apply(convert_to_currency)
+tax_breakdown_data_display['bracket_rate'] = tax_breakdown_data_display['bracket_rate'].apply(convert_to_percent)
+tax_breakdown_data_display['bracket_owed'] = tax_breakdown_data_display['bracket_owed'].apply(convert_to_currency)
+mapper = {
+    "bracket_low": "From...",
+    "bracket_high": "... to",
+    "bracket_rate": "You pay...",
+    "bracket_owed": "...which is"
+}
+tax_breakdown_data_display = tax_breakdown_data_display.rename(mapper, axis='columns')
+tax_breakdown_data_display = tax_breakdown_data_display.drop(["cum_owed_low", "cum_owed_high", "color"], axis='columns')
+st.dataframe(tax_breakdown_data_display, hide_index=True, use_container_width=True)
+st.markdown(f"Which amounts to a total tax obligation of **{total_owed}**.")
+st.markdown(f"However, this is only one part of the tax calculation. There may be additional taxes to pay.")
+st.markdown(f"""You may also be eligible for deductions. A typical deduction will reduce the taxable income you have. 
+            In a progressive tax bracket this means you pay less in the highest-taxed brackets.""")
