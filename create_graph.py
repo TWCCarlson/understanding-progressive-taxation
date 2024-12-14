@@ -2,6 +2,7 @@ import pandas as pd
 import altair as alt
 import pprint as pp
 import numpy as np
+import calculate_tax_data
 class TaxBracketBreakdownGraph:
     def __init__(self, tax_breakdown_data, user_income: int, tax_bracket_data: dict):
         self.tax_breakdown_data = tax_breakdown_data
@@ -144,3 +145,67 @@ class TaxBracketBreakdownGraph:
 
     def get_full_combochart(self):
         return alt.layer(*self.chart_assembly)
+    
+class TaxBracketStepGraph:
+    def __init__(self, brackets, buffer=1.2) -> None:
+        data = self.calculate_data(brackets, buffer)
+        self.set_axis_styles(data)
+        self.draw_bracket_step_graph(data)
+
+    def calculate_data(self, brackets, buffer):
+        brackets_c = np.array(list(brackets.keys()))
+        brackets_c = brackets_c.astype(int)
+        buffered_income = brackets_c[np.isfinite(brackets_c)].max() * buffer
+        data = calculate_tax_data.calculate_tax_breakdown_data(buffered_income, 
+                                                               brackets)
+        return data
+    
+    def set_axis_styles(self, data):
+        self.x_axis_def = alt.Axis(labelFontSize=14, labelAngle=-60,
+                                   format='$,.2f', values=data['bracket_low'],
+                                   labelOverlap='greedy')
+        self.y_axis_def = alt.Axis(labelFontSize=14, format='%')
+
+    def draw_bracket_step_graph(self, data):
+        self.chart = alt.Chart(data).mark_line(interpolate='step-after').encode(
+            x=alt.X('bracket_low:Q', axis=self.x_axis_def, title="Income"),
+            y=alt.Y('bracket_rate:Q', axis=self.y_axis_def, title="Bracket Tax Rate"),
+            tooltip=[alt.Tooltip('bracket_low:Q', format='$,.2f', title="Income"),
+                     alt.Tooltip('bracket_rate:Q', format='.0%', title="Bracket Tax Rate")]
+        )
+
+    def get_chart(self):
+        return self.chart
+    
+class TaxOwedGraph:
+    def __init__(self, brackets, buffer=1.2) -> None:
+        data = self.calculate_data(brackets, buffer)
+        self.set_axis_styles()
+        self.draw_tax_owed_graph(data)
+
+    def calculate_data(self, brackets, buffer):
+        brackets_c = np.array(list(brackets.keys()))
+        brackets_c = brackets_c.astype(int)
+        buffered_income = brackets_c[np.isfinite(brackets_c)].max() * buffer
+        data = calculate_tax_data.calculate_cumulative_tax(buffered_income, 
+                                                           brackets)
+        return data
+
+    def set_axis_styles(self):
+        self.x_axis_def = alt.Axis(labelFontSize=14, labelAngle=-60,
+                                   format='$,.2f')
+        self.y_axis_def = alt.Axis(labelFontSize=14, format='$,.2f')
+        
+    def draw_tax_owed_graph(self, data):
+        chart = alt.Chart(data).mark_line(color='red').encode(
+            x=alt.X('Owed:Q', axis=self.x_axis_def),
+            y=alt.Y('Income:Q', axis=self.y_axis_def)
+        )
+        point_chart = chart.mark_point().encode(
+            x='Owed:Q',
+            y='Income:Q'
+        )
+        self.chart = alt.layer(chart + point_chart)
+
+    def get_chart(self):
+        return self.chart

@@ -5,8 +5,9 @@ import glob
 import json
 import locale
 locale.setlocale(locale.LC_ALL, 'en_US')
+from datetime import datetime
 
-import create_bracket_graph
+import create_graph
 import calculate_tax_data
 
 
@@ -104,8 +105,12 @@ def get_bracket_data_remote(owner, repo, db_key, country, fiscal_year, filer_typ
     response = requests.get(f'https://raw.githubusercontent.com/' + 
                             f'{owner}/{repo}/refs/heads/main/{user_bracket_path}',
                             auth=(owner, f'{db_key}'))
-    brackets = response.json() #dict, but all k-v are str
-    return brackets
+    print(response.status_code)
+    if response.status_code != 404:
+        brackets = response.json() #dict, but all k-v are str
+        return brackets
+    else:
+        raise ValueError("Specified Data Does Not Exist")
 
 def get_bracket_data_local(country, fiscal_year, filer_type):
     user_bracket_path = f"bracket-data-store/{country}/{fiscal_year}/{filer_type}.json"
@@ -118,6 +123,14 @@ def coerce_bracket_data_types(brackets):
     return brackets
 
 
+def convert_to_currency(value):
+    return locale.currency(value, grouping=True)
+
+
+def convert_to_percent(value, decimal_digits=2):
+    return '{:.{dd}%}'.format(value, dd=decimal_digits)
+
+
 if LOCAL_DEVELOPMENT:
     tree = get_tax_database_local(path)
 else:
@@ -125,9 +138,61 @@ else:
     tree = parse_db_structure(db)
 
 
-st.markdown("# Using Progressive Tax Brackets")
-st.markdown("It can be hard to estimate how much tax you owe at the end of the year when there are multiple brackets with different tax rates.")
-st.markdown("Use this calculator to get a rough idea of how much tax you owe.")
+st.markdown("# What are Progressive Tax Brackets?")
+st.markdown("""The United States uses a progressive tax system. That means that 
+            the amount you pay is broken out into several tax brackets. In
+            each bracket you pay a certain rate on the income falling in that 
+            bracket. The tax rate in each bracket increases as income levels do.""")
+st.markdown("""This makes it harder to estimate what you owe in your head, but 
+            it also means that if you make less you keep a bigger percent of 
+            what you earn. Earning more also doesn't retroactively punish you 
+            because the parts of your income that fall into lower brackets are 
+            still taxed at a lower rate.""")
+st.markdown("""Here's an example:""")
+
+example_income = 65000
+example_country = "United States"
+# example_year = str(datetime.now().year)
+example_year = "2025"
+example_status = "Single Filer"
+if LOCAL_DEVELOPMENT:
+    brackets = get_bracket_data_local(example_country, example_year, example_status)
+else:
+    brackets = get_bracket_data_remote(owner, repo, db_key, example_country, 
+                                       example_year, example_status)
+brackets = coerce_bracket_data_types(brackets)
+example_data = calculate_tax_data.calculate_tax_breakdown_data(example_income, brackets)
+example_chart = create_graph.TaxBracketBreakdownGraph(example_data, example_income, brackets)
+st.altair_chart(example_chart.get_full_combochart(), theme=None, use_container_width=True)
+example_tax_paid = example_data['cum_owed_high'].max()
+example_eff_rate_fmt = convert_to_percent(example_tax_paid/example_income, 2)
+example_income_fmt = convert_to_currency(example_income)
+example_tax_paid_fmt = convert_to_currency(example_tax_paid)
+
+st.markdown("""Here's another way to think about it. Whenever your income is
+            high enough to enter a new bracket your *marginal tax rate* increases.
+            The marginal tax rate is the amount of tax you pay on the next dollar
+            earned.""")
+
+bracket_step_chart = create_graph.TaxBracketStepGraph(brackets)
+st.altair_chart(bracket_step_chart.get_chart(), theme=None, use_container_width=True)
+
+
+st.markdown(f"""Another measure is the *effective tax rate*. That's the calculated 
+            percent of your income that you owe as tax. For the above example, 
+            paying **\{example_tax_paid_fmt}** in tax on **\{example_income_fmt}** 
+            of income is an effective tax rate of **{example_eff_rate_fmt}**.""")
+st.markdown(f"""In the graph below you can see that after a certain amount of income
+            the proportion of your income you pay in taxes becomes a straight line.
+            This is because at the top end there aren't as many brackets, so
+            most of the income gets taxed at the higher rates. However, those early
+            brackets still tax you at a lower rate.""")
+tax_owed_graph = create_graph.TaxOwedGraph(brackets)
+st.altair_chart(tax_owed_graph.get_chart(), theme=None, use_container_width=True)
+
+
+
+st.markdown("You can use this calculator to try it out for yourself:")
 countries = get_country_options(tree)
 country = st.selectbox("Select your country:", countries)
 fiscal_years = get_year_options(tree[country])
@@ -147,19 +212,13 @@ else:
 brackets = coerce_bracket_data_types(brackets)
 
 tax_breakdown_data = calculate_tax_data.calculate_tax_breakdown_data(user_income, brackets)
-chart = create_bracket_graph.TaxBracketBreakdownGraph(tax_breakdown_data, user_income, brackets)
+chart = create_graph.TaxBracketBreakdownGraph(tax_breakdown_data, user_income, brackets)
 st.altair_chart(chart.get_full_combochart(), theme=None, use_container_width=True)
 
 st.write(f"Here's a tabular breakdown.")
 st.markdown(f"If you earn **{locale.currency(user_income, grouping=True)}** in **{fiscal_year}** as a **{filer_type}** while living in **{country}**...")
 tax_breakdown_data_display = tax_breakdown_data
 total_owed = locale.currency(tax_breakdown_data['bracket_owed'].sum(), grouping=True)
-
-def convert_to_currency(value):
-    return locale.currency(value, grouping=True)
-
-def convert_to_percent(value):
-    return f"{value*100}%"
 
 tax_breakdown_data_display['bracket_low'] = tax_breakdown_data_display['bracket_low'].apply(convert_to_currency)
 tax_breakdown_data_display['bracket_high'] = tax_breakdown_data_display['bracket_high'].apply(convert_to_currency)
