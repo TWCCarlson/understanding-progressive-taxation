@@ -138,23 +138,26 @@ else:
     tree = parse_db_structure(db)
 
 
-st.markdown("# What are Progressive Tax Brackets?")
-st.markdown("""The United States uses a progressive tax system. That means that 
-            the amount you pay is broken out into several tax brackets. In
-            each bracket you pay a certain rate on the income falling in that 
-            bracket. The tax rate in each bracket increases as income levels do.""")
+st.markdown("## What are Progressive Tax Brackets?")
+st.markdown("""The United States uses a progressive tax system. This means that 
+            the amount you pay is broken out into several *tax brackets*. In
+            each bracket you pay a certain rate on the income in that bracket. 
+            The tax rate of brackets *progressively* increase as the income
+            levels rise.""")
 st.markdown("""This makes it harder to estimate what you owe in your head, but 
             it also means that if you make less you keep a bigger percent of 
             what you earn. Earning more also doesn't retroactively punish you 
             because the parts of your income that fall into lower brackets are 
             still taxed at a lower rate.""")
-st.markdown("""Here's an example:""")
-
 example_income = 65000
 example_country = "United States"
 # example_year = str(datetime.now().year)
 example_year = "2025"
 example_status = "Single Filer"
+st.markdown(f"""Here's an example for someone who makes 
+            **{convert_to_currency(example_income)}** in 
+            **{example_year}** as a **{example_status}**:""")
+
 if LOCAL_DEVELOPMENT:
     brackets = get_bracket_data_local(example_country, example_year, example_status)
 else:
@@ -183,7 +186,7 @@ st.markdown(f"""Another measure is the *effective tax rate*. That's the calculat
             paying **\{example_tax_paid_fmt}** in tax on **\{example_income_fmt}** 
             of income is an effective tax rate of **{example_eff_rate_fmt}**.""")
 st.markdown(f"""In the graph below you can see that after a certain amount of income
-            the proportion of your income you pay in taxes becomes a straight line.
+            the portion of your income you pay in taxes becomes a straight line.
             This is because at the top end there aren't as many brackets, so
             most of the income gets taxed at the higher rates. However, those early
             brackets still tax you at a lower rate.""")
@@ -191,15 +194,16 @@ tax_owed_graph = create_graph.TaxOwedGraph(brackets)
 st.altair_chart(tax_owed_graph.get_chart(), theme=None, use_container_width=True)
 
 
-
-st.markdown("You can use this calculator to try it out for yourself:")
-countries = get_country_options(tree)
-country = st.selectbox("Select your country:", countries)
+st.markdown("## Try it yourself")
+st.markdown("""You can use this calculator to simulate US Federal tax brackets:""")
+# countries = get_country_options(tree)
+# country = st.selectbox("Select your country:", countries)
+country = "United States"
 fiscal_years = get_year_options(tree[country])
 fiscal_year = st.selectbox("Select the fiscal year:", fiscal_years)
 filer_types = get_filer_options(tree[country][fiscal_year])
 filer_type = st.selectbox("Choose your filing status:", filer_types, 
-                          help="Generally tax brackets favor those with dependents.")
+                          help="Tax brackets typically favor filers with dependents.")
 
 user_income = st.number_input(label="Input your taxable income (in your country's currency):",
                                 key="income_input", value=65000)
@@ -233,7 +237,7 @@ mapper = {
 tax_breakdown_data_display = tax_breakdown_data_display.rename(mapper, axis='columns')
 tax_breakdown_data_display = tax_breakdown_data_display.drop(["cum_owed_low", "cum_owed_high", "color"], axis='columns')
 st.dataframe(tax_breakdown_data_display, hide_index=True, use_container_width=True)
-st.markdown(f"Which amounts to a total tax obligation of **{total_owed}**.")
-st.markdown(f"However, this is only one part of the tax calculation. There may be additional taxes to pay.")
-st.markdown(f"""You may also be eligible for deductions. A typical deduction will reduce the taxable income you have. 
-            In a progressive tax bracket this means you pay less in the highest-taxed brackets.""")
+st.markdown(f"Which amounts to a total federal tax obligation of **{total_owed}**.")
+st.markdown(f"This is only part of the tax calculation. You may owe additional taxes, such as state or social security.")
+st.markdown(f"""You may also be eligible for deductions. A typical deduction will reduce the taxable income you have from the top. 
+            In a progressive tax bracket system this means you pay less in the highest-taxed brackets.""")
