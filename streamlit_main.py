@@ -168,6 +168,8 @@ def get_param_url(country, fiscal_year, filer_type, income):
                 f"&filer={filer_type}" +
                 f"&income={income}" +
                 f"#try-it-yourself")
+    # Replace spaces with %20
+    param_url = param_url.replace(" ", "%20")
     return param_url
 
 
