@@ -6,7 +6,12 @@ import json
 import locale
 locale.setlocale(locale.LC_ALL, 'en_US')
 from datetime import datetime
+import urllib.parse
 
+# 3rd party Streamlit components
+from st_copy_to_clipboard import st_copy_to_clipboard
+
+# My stuff
 import create_graph
 import calculate_tax_data
 
@@ -16,6 +21,17 @@ owner = st.secrets.database.db_username
 db_key = st.secrets.database.db_api_key
 repo = "understanding-progressive-taxation"
 path = "bracket-data-store"
+
+
+def fetch_parameter(param_name, default_value):
+    try:
+        return st.query_params[param_name]
+    except KeyError:
+        return default_value
+    
+
+def set_parameter(param_name, value):
+    st.query_params[param_name] = value
 
 
 @st.cache_data
@@ -131,6 +147,30 @@ def convert_to_percent(value, decimal_digits=2):
     return '{:.{dd}%}'.format(value, dd=decimal_digits)
 
 
+def find_default_index(_list: list, value):
+    try:
+        return _list.index(value)
+    except ValueError:
+        return 0
+
+
+def get_base_url():
+    session = st.runtime.get_instance()._session_mgr.list_active_sessions()[0]
+    st_base_url = urllib.parse.urlunparse([session.client.request.protocol, 
+                                           session.client.request.host, 
+                                           "", "", "", ""])
+    return st_base_url
+
+
+def get_param_url(country, fiscal_year, filer_type, income):
+    param_url = (f"/?country={country}" +
+                f"&year={fiscal_year}" +
+                f"&filer={filer_type}" +
+                f"&income={income}" +
+                f"#try-it-yourself")
+    return param_url
+
+
 if LOCAL_DEVELOPMENT:
     tree = get_tax_database_local(path)
 else:
@@ -198,15 +238,20 @@ st.markdown("## Try it yourself")
 st.markdown("""You can use this calculator to simulate US Federal tax brackets:""")
 # countries = get_country_options(tree)
 # country = st.selectbox("Select your country:", countries)
-country = "United States"
+# country = "United States"
+country = fetch_parameter("country", "United States")
 fiscal_years = get_year_options(tree[country])
-fiscal_year = st.selectbox("Select the fiscal year:", fiscal_years)
+fiscal_year = fetch_parameter("year", fiscal_years[0])
+i = find_default_index(fiscal_years, fiscal_year)
+fiscal_year = st.selectbox("Select the fiscal year:", fiscal_years, index=i)
 filer_types = get_filer_options(tree[country][fiscal_year])
-filer_type = st.selectbox("Choose your filing status:", filer_types, 
+filer_type = fetch_parameter("filer", filer_types[0])
+i = find_default_index(filer_types, filer_type)
+filer_type = st.selectbox("Choose your filing status:", filer_types, index=i,
                           help="Tax brackets typically favor filers with dependents.")
-
+income = int(fetch_parameter("income", 65000))
 user_income = st.number_input(label="Input your taxable income (in your country's currency):",
-                                key="income_input", value=65000)
+                                key="income_input", value=income)
 
 if LOCAL_DEVELOPMENT:
     brackets = get_bracket_data_local(country, fiscal_year, filer_type)
@@ -220,9 +265,11 @@ chart = create_graph.TaxBracketBreakdownGraph(tax_breakdown_data, user_income, b
 st.altair_chart(chart.get_full_combochart(), theme=None, use_container_width=True)
 
 st.write(f"Here's a tabular breakdown.")
-st.markdown(f"If you earn **{locale.currency(user_income, grouping=True)}** in **{fiscal_year}** as a **{filer_type}** while living in **{country}**...")
+st.markdown(f"""If you earn **{convert_to_currency(user_income)}** in 
+            **{fiscal_year}** as a **{filer_type}** while living in 
+            **{country}**...""")
 tax_breakdown_data_display = tax_breakdown_data
-total_owed = locale.currency(tax_breakdown_data['bracket_owed'].sum(), grouping=True)
+total_owed = convert_to_currency(tax_breakdown_data['bracket_owed'].sum())
 
 tax_breakdown_data_display['bracket_low'] = tax_breakdown_data_display['bracket_low'].apply(convert_to_currency)
 tax_breakdown_data_display['bracket_high'] = tax_breakdown_data_display['bracket_high'].apply(convert_to_currency)
@@ -238,6 +285,14 @@ tax_breakdown_data_display = tax_breakdown_data_display.rename(mapper, axis='col
 tax_breakdown_data_display = tax_breakdown_data_display.drop(["cum_owed_low", "cum_owed_high", "color"], axis='columns')
 st.dataframe(tax_breakdown_data_display, hide_index=True, use_container_width=True)
 st.markdown(f"Which amounts to a total federal tax obligation of **{total_owed}**.")
+
+with st.columns((2,1,2))[1]:
+    base_url = get_base_url()
+    param_url = get_param_url(country, fiscal_year, filer_type, user_income)
+    st_copy_to_clipboard(base_url+param_url, 
+                         before_copy_label="Share this result 📋",
+                         after_copy_label="Copied your result! ✅")
+
 st.markdown(f"This is only part of the tax calculation. You may owe additional taxes, such as state or social security.")
 st.markdown(f"""You may also be eligible for deductions. A typical deduction will reduce the taxable income you have from the top. 
             In a progressive tax bracket system this means you pay less in the highest-taxed brackets.""")
