@@ -102,6 +102,8 @@ def get_year_options(file_tree):
     fiscal_years = []
     for fiscal_year in file_tree.keys():
         fiscal_years.append(fiscal_year)
+    # Reverse to show most recent years first
+    fiscal_years.reverse()
     return fiscal_years
 
 
@@ -179,7 +181,6 @@ else:
     db = get_tax_database_remote(owner, repo, path, db_key)
     tree = parse_db_structure(db)
 
-
 st.markdown("## What are Progressive Tax Brackets?")
 st.markdown("""The United States uses a progressive tax system. This means that 
             the amount you pay is broken out into several *tax brackets*. In
@@ -245,7 +246,11 @@ country = fetch_parameter("country", "United States")
 fiscal_years = get_year_options(tree[country])
 fiscal_year = fetch_parameter("year", fiscal_years[0])
 i = find_default_index(fiscal_years, fiscal_year)
-fiscal_year = st.selectbox("Select the fiscal year:", fiscal_years, index=i)
+fiscal_year = st.selectbox("Select the fiscal year:", fiscal_years, index=i,
+                           help="""Inflation changes the value of dollars. 
+                           This is not accounted for by this calculator.
+                           Use an inflation calculator to determine your equivalent
+                           income in another year.""")
 filer_types = get_filer_options(tree[country][fiscal_year])
 filer_type = fetch_parameter("filer", filer_types[0])
 i = find_default_index(filer_types, filer_type)
