@@ -238,7 +238,10 @@ st.altair_chart(tax_owed_graph.get_chart(), theme=None, use_container_width=True
 
 
 st.markdown("## Try it yourself")
-st.markdown("""You can use this calculator to simulate US Federal tax brackets:""")
+st.markdown("""You can use this calculator to simulate US Federal tax brackets.
+            Data for years 2021-1862 sourced from [TaxFoundation.org](https://taxfoundation.org/data/all/federal/historical-income-tax-rates-brackets/).
+            Other data sourced by hand. Do note that this calculator does not 
+            adjust for inflation""")
 # countries = get_country_options(tree)
 # country = st.selectbox("Select your country:", countries)
 # country = "United States"
